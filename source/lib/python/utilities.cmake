@@ -51,11 +51,10 @@ set(ROCPROFILER_PYTHON_VERSION_CANDIDATES
     CACHE STRING "Python versions to search for, newest first")
 
 function(get_default_python_versions _VAR)
-    rocprofiler_reset_python3_cache()
-
     set(_PYTHON_FOUND_VERSIONS)
 
     foreach(_VER IN LISTS ROCPROFILER_PYTHON_VERSION_CANDIDATES)
+        rocprofiler_reset_python3_cache()
         find_package(Python3 ${_VER} EXACT QUIET COMPONENTS Interpreter Development)
         if(Python3_FOUND)
             list(APPEND _PYTHON_FOUND_VERSIONS
@@ -65,6 +64,7 @@ function(get_default_python_versions _VAR)
 
     # If none found, do one last check for 3.6 (no EXACT)
     if(NOT _PYTHON_FOUND_VERSIONS)
+        rocprofiler_reset_python3_cache()
         find_package(Python3 3.6 COMPONENTS Interpreter Development)
         if(Python3_FOUND)
             list(APPEND _PYTHON_FOUND_VERSIONS
@@ -132,6 +132,10 @@ function(rocprofiler_roctx_python_bindings _VERSION)
         COMPONENT roctx)
 endfunction()
 
+function(rocprofiler_rocpd_python_bindings_object_sources)
+    target_sources(rocprofiler-sdk-rocpd-python-bindings-object-library ${ARGN})
+endfunction()
+
 function(rocprofiler_rocpd_python_bindings_target_sources _VERSION)
     target_sources(rocprofiler-sdk-rocpd-python-bindings-${_VERSION} ${ARGN})
 endfunction()
@@ -166,11 +170,36 @@ function(rocprofiler_rocpd_python_bindings _VERSION)
             COMPONENT rocpd)
     endforeach()
 
+    if(NOT TARGET rocprofiler-sdk-rocpd-python-bindings-object-library)
+        add_library(rocprofiler-sdk-rocpd-python-bindings-object-library OBJECT)
+        add_library(rocprofiler-sdk::rocpd-python-bindings-object-library ALIAS
+                    rocprofiler-sdk-rocpd-python-bindings-object-library)
+        target_link_libraries(
+            rocprofiler-sdk-rocpd-python-bindings-object-library
+            PRIVATE rocprofiler-sdk::rocprofiler-sdk-headers
+                    rocprofiler-sdk::rocprofiler-sdk-build-flags
+                    rocprofiler-sdk::rocprofiler-sdk-memcheck
+                    rocprofiler-sdk::rocprofiler-sdk-common-library
+                    rocprofiler-sdk::rocprofiler-sdk-output-library
+                    rocprofiler-sdk::rocprofiler-sdk-cereal
+                    rocprofiler-sdk::rocprofiler-sdk-perfetto
+                    rocprofiler-sdk::rocprofiler-sdk-otf2
+                    rocprofiler-sdk::rocprofiler-sdk-sqlite3
+                    rocprofiler-sdk::rocprofiler-sdk-pybind11
+                    rocprofiler-sdk::rocprofiler-sdk-gotcha
+                    rocprofiler-sdk::rocprofiler-sdk-dw
+                    rocprofiler-sdk::rocprofiler-sdk-static-library
+                    rocprofiler-sdk::rocprofiler-sdk-rocpd-library)
+        set_target_properties(rocprofiler-sdk-rocpd-python-bindings-object-library
+                              PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
+
     add_library(rocprofiler-sdk-rocpd-python-bindings-${_VERSION} MODULE)
     target_sources(
         rocprofiler-sdk-rocpd-python-bindings-${_VERSION}
         PRIVATE libpyrocpd.cpp libpyrocpd.hpp
-                $<TARGET_OBJECTS:rocprofiler-sdk::rocprofiler-sdk-object-library>)
+                $<TARGET_OBJECTS:rocprofiler-sdk::rocprofiler-sdk-object-library>
+                $<TARGET_OBJECTS:rocprofiler-sdk::rocpd-python-bindings-object-library>)
     target_include_directories(rocprofiler-sdk-rocpd-python-bindings-${_VERSION} SYSTEM
                                PRIVATE ${Python3_INCLUDE_DIRS})
     target_link_libraries(
